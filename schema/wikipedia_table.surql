@@ -1,4 +1,4 @@
-BEGIN TRANSACTION;
+USE NS test; USE DB test;
 
 DEFINE TABLE wiki_embeddings SCHEMAFULL;
 
@@ -22,6 +22,4 @@ DEFINE INDEX embeddings ON wiki_embeddings
     FIELDS content_vector
     MTREE DIMENSION 1536
     DIST COSINE;
-
-COMMIT TRANSACTION;
 

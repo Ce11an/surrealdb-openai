@@ -17,9 +17,7 @@ FORMATTED_RECORD_FOR_INSERT_WIKI_EMBEDDING = string.Template(
 
 INSERT_WIKI_EMBEDDING_QUERY = string.Template(
     """
-    BEGIN TRANSACTION;
     INSERT INTO wiki_embeddings [\n $records\n];
-    COMMIT TRANSACTION;
     """
 )
 
