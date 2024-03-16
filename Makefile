@@ -20,7 +20,7 @@ fmt: ## Format code
 
 .PHONY: surreal-start
 surreal-start: ## Start SurrealDB
-	surreal start --auth --user root --pass root file://data/srdb.db --bind $(ADDRESS)
+	surreal start --auth --user root --pass root --log debug file://data/srdb.db --bind $(ADDRESS)
 
 .PHONY: surreal-init
 surreal-init: ## Initialise SurrealDB to populate with data
