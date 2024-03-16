@@ -1,7 +1,6 @@
 """Load and insert Wikipedia embeddings into SurrealDB"""
 
 import ast
-import asyncio
 import logging
 import string
 import zipfile
