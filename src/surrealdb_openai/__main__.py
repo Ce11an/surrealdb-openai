@@ -64,7 +64,7 @@ def get_data() -> None:
     logger.info("Extracted file successfully. Please check the data folder")
 
 
-async def _surreal_insert() -> None:
+def surreal_insert() -> None:
     """Main entrypoint to insert Wikipedia embeddings into SurrealDB."""
     logger = setup_logger("surreal_insert")
 
@@ -73,11 +73,10 @@ async def _surreal_insert() -> None:
     )
 
     logger.info("Connecting to SurrealDB")
-    connection = surrealdb.AsyncSurrealDB("ws://localhost:8080/rpc")
-    await connection.connect()
-    await connection.signin(data={"username": "root", "password": "root"})
-    await connection.use_namespace("test")
-    await connection.use_database("test")
+    connection = surrealdb.SurrealDB("ws://localhost:8080/rpc")
+    connection.signin(data={"username": "root", "password": "root"})
+    connection.use_namespace("test")
+    connection.use_database("test")
 
     logger.info("Inserting rows into SurrealDB")
     with tqdm.tqdm(total=total_chunks, desc="Inserting") as pbar:
@@ -106,13 +105,10 @@ async def _surreal_insert() -> None:
                 )
                 for _, row in chunk.iterrows()  # type: ignore
             ]
-            await connection.query(
+            connection.query(
                 query=INSERT_WIKI_EMBEDDING_QUERY.substitute(
                     records=",\n ".join(formatted_rows)
                 )
             )
             pbar.update(1)
 
-
-def surreal_insert() -> None:
-    asyncio.run(_surreal_insert())
