@@ -21,7 +21,7 @@ DEFINE FIELD content_vector ON TABLE wiki_embeddings TYPE array<float>
 DEFINE INDEX embeddings ON wiki_embeddings
     FIELDS content_vector
     MTREE DIMENSION 1536
-    DIST EUCLIDEAN;
+    DIST COSINE;
 
 COMMIT TRANSACTION;
 
