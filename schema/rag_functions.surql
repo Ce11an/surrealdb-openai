@@ -76,18 +76,14 @@ DEFINE FUNCTION IF NOT EXISTS fn::chat_complete($model: string, $question: strin
     )["choices"][0]["message"]["content"];
 };
 
-DEFINE FUNCTION IF NOT EXISTS fn::surreal_rag($input: string) {
+DEFINE FUNCTION IF NOT EXISTS fn::surreal_rag($model: string, $input: string, $threshold: float) {
 
     LET $input_vector = fn::embeddings_complete("text-embedding-ada-002", $input);
 
-    LET $context_document = fn::search_for_documents($input_vector, 0.8);
+    LET $context_document = fn::search_for_documents($input_vector, $threshold);
 
     LET $prompt_with_context = fn::get_prompt_with_context($context_document);
 
-    RETURN fn::chat_complete("gpt-3.5-turbo", $input, $prompt_with_context);
-};
-
-DEFINE FUNCTION IF NOT EXISTS fn::hybrid_score($similarity: float, $relevance: float, $alpha: float) {
-    RETURN ((1-$alpha) * $relevance) + ($similarity * $alpha);
+    RETURN fn::chat_complete($model, $input, $prompt_with_context);
 };
 
