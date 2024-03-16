@@ -10,6 +10,7 @@ import pandas as pd
 import surrealdb
 import tqdm
 import wget
+
 FORMATTED_RECORD_FOR_INSERT_WIKI_EMBEDDING = string.Template(
     """{url: "$url", title: s"$title", text: s"$text", title_vector: $title_vector, content_vector: $content_vector}"""
 )
@@ -115,4 +116,3 @@ async def _surreal_insert() -> None:
 
 def surreal_insert() -> None:
     asyncio.run(_surreal_insert())
-
