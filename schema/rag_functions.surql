@@ -50,7 +50,7 @@ DEFINE FUNCTION IF NOT EXISTS fn::get_prompt_with_context($context: string) {
     RETURN string::replace($prompt, '$context', $context);
 };
 
-DEFINE FUNCTION IF NOT EXISTS fn::chat_complete($llm: string, $question: string, $prompt_with_context: string) {
+DEFINE FUNCTION IF NOT EXISTS fn::chat_complete($llm: string, $input: string, $prompt_with_context: string) {
     RETURN http::post(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -61,7 +61,7 @@ DEFINE FUNCTION IF NOT EXISTS fn::chat_complete($llm: string, $question: string,
                  "content": $prompt_with_context
                 },
                 {
-                    "role": "user", "content": $question
+                    "role": "user", "content": $input
                 },
             ],
         "temperature": 0.5
