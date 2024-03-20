@@ -108,4 +108,3 @@ def surreal_insert() -> None:
                 )
             )
             pbar.update(1)
-
