@@ -1,3 +1,7 @@
+DEFINE FUNCTION IF NOT EXISTS fn::get_openai_token() {
+    RETURN "Bearer <place-your-key-here>"
+};
+
 DEFINE FUNCTION IF NOT EXISTS fn::embeddings_complete($embedding_model: string, $input: string) {
     RETURN http::post(
         "https://api.openai.com/v1/embeddings",
