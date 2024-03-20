@@ -152,7 +152,8 @@ cython_debug/
 #.idea/
 
 # SurrealDB OpenAI
-data/
+data/*
+!data/.gitkeep
 history.txt
 .python-version
 
