@@ -1,0 +1,4 @@
+<div class="system message" hx-trigger="load" hx-get="/create_title/{{ chat_id }}"
+    hx-target=".chat_{{ chat_id | extract_numeric_id }}">
+    {{ response_from_assistant }}
+</div>

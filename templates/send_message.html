@@ -1,0 +1,5 @@
+<div class="user message" hx-trigger="load" hx-get="/get_response/{{ chat_id }}" hx-target=".messages"
+    hx-swap="beforeend">
+    {{ content | safe }}
+</div>
+<script>document.getElementById('messageform').reset();</script>

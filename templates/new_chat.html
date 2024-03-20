@@ -1,0 +1,3 @@
+<button hx-get="/load_chat/{{ chat_id }}" hx-target="main" hx-trigger="click, load"
+    class="chat-{{ chat_id | extract_numeric_id }}">{{
+    chat_title }}</button>
