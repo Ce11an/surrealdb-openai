@@ -1,14 +1,17 @@
 """Load and insert Wikipedia embeddings into SurrealDB"""
 
 import ast
+import contextlib
 import logging
 import string
 import zipfile
 
+import fastapi
 import pandas as pd
 import surrealdb
 import tqdm
 import wget
+from fastapi import templating, responses, staticfiles
 
 FORMATTED_RECORD_FOR_INSERT_WIKI_EMBEDDING = string.Template(
     """{url: "$url", title: s"$title", text: s"$text", title_vector: $title_vector, content_vector: $content_vector}"""
@@ -22,6 +25,136 @@ INSERT_WIKI_EMBEDDING_QUERY = string.Template(
 
 TOTAL_ROWS = 25000
 CHUNK_SIZE = 100
+
+
+def extract_numeric_id(surrealdb_id: str) -> str:
+    return surrealdb_id.split(":")[1]
+
+
+templates = templating.Jinja2Templates(directory="templates")
+templates.env.filters["extract_numeric_id"] = extract_numeric_id
+database = {}
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: fastapi.FastAPI):
+    connection = surrealdb.AsyncSurrealDB(url="ws://localhost:8080/rpc")
+    await connection.connect()
+    await connection.signin(data={"username": "root", "password": "root"})
+    await connection.use_namespace("test")
+    await connection.use_database("test")
+    database["surrealdb"] = connection
+    yield
+    database.clear()
+
+
+app = fastapi.FastAPI(lifespan=lifespan)
+app.mount("/static", staticfiles.StaticFiles(directory="static"), name="static")
+
+
+@app.get("/", response_class=responses.HTMLResponse)
+async def get_index(request: fastapi.Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.post("/new_chat", response_class=responses.HTMLResponse)
+async def new_chat(request: fastapi.Request):
+    chat_title = "Untitled chat"
+    chat_record = await database["surrealdb"].query(
+        f"""CREATE ONLY chat SET title = '{chat_title}';"""
+    )
+    return templates.TemplateResponse(
+        "new_chat.html",
+        {
+            "request": request,
+            "chat_id": chat_record.get("id"),
+            "chat_title": chat_title,
+        },
+    )
+
+
+@app.get("/load_chat/{chat_id}", response_class=responses.HTMLResponse)
+async def load_chat(request: fastapi.Request, chat_id: str):
+    chat_record = await database["surrealdb"].query(
+        f"""
+        SELECT
+            title,
+            (SELECT content, role FROM ->sent->message) AS messages
+        FROM ONLY {chat_id};
+        """
+    )
+
+    return templates.TemplateResponse(
+        "load_chat.html",
+        {
+            "request": request,
+            "messages": chat_record.get("messages"),
+            "chat_id": chat_id,
+        },
+    )
+
+
+@app.get("/conversations", response_class=responses.HTMLResponse)
+async def get_conversations(request: fastapi.Request):
+    chats = await database["surrealdb"].query("""SELECT id, title FROM chat;""")
+    return templates.TemplateResponse(
+        "conversations.html", {"request": request, "chats": chats}
+    )
+
+
+@app.post("/send_message", response_class=responses.HTMLResponse)
+async def send_message(
+    request: fastapi.Request,
+    chat_id: str = fastapi.Form(...),
+    content: str = fastapi.Form(...),
+):
+    message_record = await database["surrealdb"].query(
+        f"""CREATE ONLY message SET role = 'user', content = '{content}';"""
+    )
+
+    await database["surrealdb"].query(
+        f"""RELATE {chat_id}->sent->{message_record.get("id")};"""
+    )
+
+    return templates.TemplateResponse(
+        "send_message.html",
+        {
+            "request": request,
+            "chat_id": chat_id,
+            "content": message_record.get("content"),
+        },
+    )
+
+
+@app.get("/get_response/{chat_id}", response_class=responses.HTMLResponse)
+async def get_response(request: fastapi.Request, chat_id: str):
+    response_from_assistant = "This is a simulated response."
+
+    message_record = await database["surrealdb"].query(
+        f"""CREATE ONLY message SET role = 'system', content = '{response_from_assistant}';"""
+    )
+
+    await database["surrealdb"].query(
+        f"""RELATE {chat_id}->sent->{message_record.get("id")};"""
+    )
+
+    #TODO: Check if title exists first
+    create_title = f'hx-trigger="load" hx-get="/create_title/{chat_id}" hx-target=".chat-{extract_numeric_id(chat_id)}"'
+
+    return responses.HTMLResponse(
+        content=f'<div class="system message" {create_title}>{message_record["content"]}</div>'
+    )
+
+
+@app.get("/create_title/{chat_id}", response_class=responses.PlainTextResponse)
+async def create_title(request: fastapi.Request, chat_id: str):
+    # TODO: get name from OpenAI
+    chat_record = await database["surrealdb"].query(
+        f"""
+        UPDATE ONLY {chat_id} SET title = "I love Annie Nieh-{chat_id};"
+        """
+    )
+    return responses.PlainTextResponse(chat_record.get("title"))
 
 
 def setup_logger(name: str) -> logging.Logger:

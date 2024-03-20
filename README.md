@@ -104,6 +104,8 @@ RETURN fn::surreal_rag("gpt-3.5-turbo", "Who is the greatest basketball player o
 
 While this project focuses on performing RAG with SurrealDB and SurrealQL, after the data insertion, you are free to query the database using any preferred programming language. Additionally, tools such as LangChain can be leveraged for enhanced functionality.
 
+## Support
+
 If you have found this project helpful, please consider supporting my espresso indulgence by:
 
 <a href="https://www.buymeacoffee.com/ce11an" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
