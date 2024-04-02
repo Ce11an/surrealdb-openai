@@ -37,7 +37,7 @@ database = {}
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app: fastapi.FastAPI):
+async def lifespan(_: fastapi.FastAPI):
     connection = surrealdb.AsyncSurrealDB(url="ws://localhost:8080/rpc")
     await connection.connect()
     await connection.signin(data={"username": "root", "password": "root"})
@@ -75,20 +75,22 @@ async def new_chat(request: fastapi.Request):
 
 @app.get("/load_chat/{chat_id}", response_class=responses.HTMLResponse)
 async def load_chat(request: fastapi.Request, chat_id: str):
-    chat_record = await database["surrealdb"].query(
+    message_records = await database["surrealdb"].query(
         f"""
         SELECT
-            title,
-            (SELECT content, role FROM ->sent->message) AS messages
-        FROM ONLY {chat_id};
+            out.role AS role,
+            out.content AS content,
+            time.written AS time_written
+        FROM {chat_id}->sent
+        ORDER BY time_written
+        FETCH out
         """
     )
-
     return templates.TemplateResponse(
         "load_chat.html",
         {
             "request": request,
-            "messages": chat_record.get("messages"),
+            "messages": message_records,
             "chat_id": chat_id,
         },
     )
@@ -96,9 +98,9 @@ async def load_chat(request: fastapi.Request, chat_id: str):
 
 @app.get("/conversations", response_class=responses.HTMLResponse)
 async def get_conversations(request: fastapi.Request):
-    chats = await database["surrealdb"].query("""SELECT id, title FROM chat;""")
+    chat_records = await database["surrealdb"].query("""SELECT id, title FROM chat;""")
     return templates.TemplateResponse(
-        "conversations.html", {"request": request, "chats": chats}
+        "conversations.html", {"request": request, "chats": chat_records}
     )
 
 
@@ -113,7 +115,10 @@ async def send_message(
     )
 
     await database["surrealdb"].query(
-        f"""RELATE {chat_id}->sent->{message_record.get("id")};"""
+        f"""
+        RELATE {chat_id}->sent->{message_record.get("id")}
+            SET time.written = time::now();
+        """
     )
 
     return templates.TemplateResponse(
@@ -135,11 +140,21 @@ async def get_response(request: fastapi.Request, chat_id: str):
     )
 
     await database["surrealdb"].query(
-        f"""RELATE {chat_id}->sent->{message_record.get("id")};"""
+        f"""
+        RELATE {chat_id}->sent->{message_record.get("id")}
+            SET time.written = time::now();
+        """
     )
 
-    #TODO: Check if title exists first
-    create_title = f'hx-trigger="load" hx-get="/create_title/{chat_id}" hx-target=".chat-{extract_numeric_id(chat_id)}"'
+    chat_record = await database["surrealdb"].query(
+        f"""
+        SELECT title FROM ONLY {chat_id};
+        """
+    )
+
+    create_title = ""
+    if chat_record["title"] == "Untitled chat":
+        create_title = f'hx-trigger="load" hx-get="/create_title/{chat_id}" hx-target=".chat-{extract_numeric_id(chat_id)}"'
 
     return responses.HTMLResponse(
         content=f'<div class="system message" {create_title}>{message_record["content"]}</div>'
