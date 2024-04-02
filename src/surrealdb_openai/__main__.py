@@ -162,7 +162,7 @@ async def get_response(request: fastapi.Request, chat_id: str):
     })
 
 @app.get("/create_title/{chat_id}", response_class=responses.PlainTextResponse)
-async def create_title(request: fastapi.Request, chat_id: str):
+async def create_title(chat_id: str):
     # TODO: get name from OpenAI
     chat_record = await database["surrealdb"].query(
         f"""
