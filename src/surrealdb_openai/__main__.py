@@ -7,6 +7,7 @@ import string
 import zipfile
 
 import fastapi
+import openai
 import pandas as pd
 import surrealdb
 import tqdm
@@ -43,7 +44,11 @@ async def lifespan(_: fastapi.FastAPI):
     await connection.signin(data={"username": "root", "password": "root"})
     await connection.use_namespace("test")
     await connection.use_database("test")
+    client = openai.AsyncOpenAI(
+        api_key=""
+    )
     database["surrealdb"] = connection
+    database["openai"] = client
     yield
     database.clear()
 
@@ -97,8 +102,10 @@ async def load_chat(request: fastapi.Request, chat_id: str):
 
 
 @app.get("/conversations", response_class=responses.HTMLResponse)
-async def get_conversations(request: fastapi.Request):
-    chat_records = await database["surrealdb"].query("""SELECT id, title FROM chat;""")
+async def conversations(request: fastapi.Request):
+    chat_records = await database["surrealdb"].query(
+        """SELECT id, title FROM chat;"""
+    )
     return templates.TemplateResponse(
         "conversations.html", {"request": request, "chats": chat_records}
     )
@@ -133,9 +140,8 @@ async def send_message(
 
 @app.get("/get_response/{chat_id}", response_class=responses.HTMLResponse)
 async def get_response(request: fastapi.Request, chat_id: str):
-    #TODO: Get response from RAG
+    # TODO: Get response from RAG
     response_from_assistant = "This is a simulated response."
-
     message_record = await database["surrealdb"].query(
         f"""CREATE ONLY message SET role = 'system', content = '{response_from_assistant}';"""
     )
@@ -154,19 +160,49 @@ async def get_response(request: fastapi.Request, chat_id: str):
     )
 
     create_title = chat_record["title"] == "Untitled chat"
-    return templates.TemplateResponse("system_message.html", {
-        "request": request,
-        "content": response_from_assistant,
-        "create_title": create_title,
-        "chat_id": chat_id
-    })
+    return templates.TemplateResponse(
+        "system_message.html",
+        {
+            "request": request,
+            "content": response_from_assistant,
+            "create_title": create_title,
+            "chat_id": chat_id,
+        },
+    )
+
 
 @app.get("/create_title/{chat_id}", response_class=responses.PlainTextResponse)
 async def create_title(chat_id: str):
-    # TODO: get name from OpenAI
+    first_message_record = await database["surrealdb"].query(
+        f"""
+        SELECT
+            out.content AS content,
+            time.written AS time_written
+        FROM ONLY {chat_id}->sent
+        ORDER BY time_written
+        LIMIT 1
+        FETCH out;
+        """
+    )
+
+    completion = await database["openai"].chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a conversation title generator for a ChatGPT type app. Respond only with a simple title using the user input.",
+            },
+            {"role": "user", "content": first_message_record.get("content")},
+        ],
+        temperature=0.0,
+    )
+
+    generated_title = (
+        completion.choices[0].message.content.strip().strip('"').strip("'")
+    )
     chat_record = await database["surrealdb"].query(
         f"""
-        UPDATE ONLY {chat_id} SET title = "I love Annie Nieh-{chat_id};"
+        UPDATE ONLY {chat_id} SET title = "{generated_title}";
         """
     )
     return responses.PlainTextResponse(chat_record.get("title"))
