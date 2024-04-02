@@ -133,6 +133,7 @@ async def send_message(
 
 @app.get("/get_response/{chat_id}", response_class=responses.HTMLResponse)
 async def get_response(request: fastapi.Request, chat_id: str):
+    #TODO: Get response from RAG
     response_from_assistant = "This is a simulated response."
 
     message_record = await database["surrealdb"].query(
@@ -152,14 +153,13 @@ async def get_response(request: fastapi.Request, chat_id: str):
         """
     )
 
-    create_title = ""
-    if chat_record["title"] == "Untitled chat":
-        create_title = f'hx-trigger="load" hx-get="/create_title/{chat_id}" hx-target=".chat-{extract_numeric_id(chat_id)}"'
-
-    return responses.HTMLResponse(
-        content=f'<div class="system message" {create_title}>{message_record["content"]}</div>'
-    )
-
+    create_title = chat_record["title"] == "Untitled chat"
+    return templates.TemplateResponse("system_message.html", {
+        "request": request,
+        "content": response_from_assistant,
+        "create_title": create_title,
+        "chat_id": chat_id
+    })
 
 @app.get("/create_title/{chat_id}", response_class=responses.PlainTextResponse)
 async def create_title(request: fastapi.Request, chat_id: str):
