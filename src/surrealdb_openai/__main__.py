@@ -73,7 +73,7 @@ async def get_index(request: fastapi.Request):
 async def new_chat(request: fastapi.Request):
     chat_title = "Untitled chat"
     chat_record = await life_span["surrealdb"].query(
-        f"""CREATE ONLY chat SET title = '{chat_title}', time.written = time::now();"""
+        f"""CREATE ONLY chat SET title = '{chat_title}'"""
     )
     return templates.TemplateResponse(
         "new_chat.html",
@@ -92,7 +92,7 @@ async def load_chat(request: fastapi.Request, chat_id: str):
         SELECT
             out.role AS role,
             out.content AS content,
-            time.written AS timestamp
+            timestamp
         FROM {chat_id}->sent
         ORDER BY timestamp
         FETCH out
@@ -111,7 +111,7 @@ async def load_chat(request: fastapi.Request, chat_id: str):
 @app.get("/conversations", response_class=responses.HTMLResponse)
 async def conversations(request: fastapi.Request):
     chat_records = await life_span["surrealdb"].query(
-        """SELECT id, title, time.written AS timestamp FROM chat ORDER BY timestamp DESC;"""
+        """SELECT id, title, created_at FROM chat ORDER BY created_at DESC;"""
     )
     return templates.TemplateResponse(
         "conversations.html", {"request": request, "chats": chat_records}
@@ -130,10 +130,10 @@ async def send_message(
 
     sent_record = await life_span["surrealdb"].query(
         f"""
-        SELECT 
-            time.written as timestamp
+        SELECT
+            timestamp
         FROM ONLY RELATE ONLY {chat_id}->sent->{message_record.get("id")} 
-            SET time.written = time::now();
+            SET timestamp = time::now();
         """
     )
 
@@ -154,7 +154,7 @@ async def get_response(request: fastapi.Request, chat_id: str):
         f"""
         SELECT
             out.content AS content,
-            time.written AS timestamp 
+            timestamp AS timestamp 
         FROM ONLY {chat_id}->sent
         ORDER BY timestamp DESC
         LIMIT 1
@@ -184,10 +184,10 @@ async def get_response(request: fastapi.Request, chat_id: str):
 
     sent_record = await life_span["surrealdb"].query(
         f"""
-        SELECT 
-            time.written as timestamp
+        SELECT
+            timestamp
         FROM ONLY RELATE ONLY {chat_id}->sent->{message_record.get("id")} 
-            SET time.written = time::now();
+            SET timestamp = time::now();
         """
     )
 
@@ -216,7 +216,7 @@ async def create_title(chat_id: str):
         f"""
         SELECT
             out.content AS content,
-            time.written AS timestamp
+            timestamp
         FROM ONLY {chat_id}->sent
         ORDER BY timestamp 
         LIMIT 1
