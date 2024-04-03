@@ -2,6 +2,7 @@
 
 import ast
 import contextlib
+import datetime
 import logging
 import string
 import zipfile
@@ -32,8 +33,15 @@ def extract_numeric_id(surrealdb_id: str) -> str:
     return surrealdb_id.split(":")[1]
 
 
+def convert_timestamp_to_date(timestamp: str) -> str:
+    """Convert a datetime to a different format."""
+    parsed_timestamp = datetime.datetime.fromisoformat(timestamp.rstrip("Z"))
+    return parsed_timestamp.strftime("%B %d %Y, %H:%M")
+
+
 templates = templating.Jinja2Templates(directory="templates")
 templates.env.filters["extract_numeric_id"] = extract_numeric_id
+templates.env.filters["convert_timestamp_to_date"] = convert_timestamp_to_date
 database = {}
 
 
@@ -45,7 +53,6 @@ async def lifespan(_: fastapi.FastAPI):
     await connection.use_namespace("test")
     await connection.use_database("test")
     client = openai.AsyncOpenAI(
-        api_key=""
     )
     database["surrealdb"] = connection
     database["openai"] = client
@@ -66,7 +73,7 @@ async def get_index(request: fastapi.Request):
 async def new_chat(request: fastapi.Request):
     chat_title = "Untitled chat"
     chat_record = await database["surrealdb"].query(
-        f"""CREATE ONLY chat SET title = '{chat_title}';"""
+        f"""CREATE ONLY chat SET title = '{chat_title}', time.written = time::now();"""
     )
     return templates.TemplateResponse(
         "new_chat.html",
@@ -85,9 +92,9 @@ async def load_chat(request: fastapi.Request, chat_id: str):
         SELECT
             out.role AS role,
             out.content AS content,
-            time.written AS time_written
+            time.written AS timestamp
         FROM {chat_id}->sent
-        ORDER BY time_written
+        ORDER BY timestamp
         FETCH out
         """
     )
@@ -104,7 +111,7 @@ async def load_chat(request: fastapi.Request, chat_id: str):
 @app.get("/conversations", response_class=responses.HTMLResponse)
 async def conversations(request: fastapi.Request):
     chat_records = await database["surrealdb"].query(
-        """SELECT id, title FROM chat;"""
+        """SELECT id, title, time.written AS timestamp FROM chat ORDER BY timestamp DESC;"""
     )
     return templates.TemplateResponse(
         "conversations.html", {"request": request, "chats": chat_records}
@@ -121,9 +128,11 @@ async def send_message(
         f"""CREATE ONLY message SET role = 'user', content = '{content}';"""
     )
 
-    await database["surrealdb"].query(
+    sent_record = await database["surrealdb"].query(
         f"""
-        RELATE {chat_id}->sent->{message_record.get("id")}
+        SELECT 
+            time.written as timestamp
+        FROM ONLY RELATE ONLY {chat_id}->sent->{message_record.get("id")} 
             SET time.written = time::now();
         """
     )
@@ -134,21 +143,50 @@ async def send_message(
             "request": request,
             "chat_id": chat_id,
             "content": message_record.get("content"),
+            "timestamp": sent_record.get("timestamp"),
         },
     )
 
 
 @app.get("/get_response/{chat_id}", response_class=responses.HTMLResponse)
 async def get_response(request: fastapi.Request, chat_id: str):
-    # TODO: Get response from RAG
-    response_from_assistant = "This is a simulated response."
-    message_record = await database["surrealdb"].query(
-        f"""CREATE ONLY message SET role = 'system', content = '{response_from_assistant}';"""
+    last_user_message_record = await database["surrealdb"].query(
+        f"""
+        SELECT
+            out.content AS content,
+            time.written AS timestamp 
+        FROM ONLY {chat_id}->sent
+        ORDER BY timestamp DESC
+        LIMIT 1
+        FETCH out;
+        """
     )
 
-    await database["surrealdb"].query(
+    last_user_message = (
+        last_user_message_record.get("content")
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+    )
+
+    response_from_assistant = await database["surrealdb"].query(
         f"""
-        RELATE {chat_id}->sent->{message_record.get("id")}
+        RETURN fn::surreal_rag("gpt-3.5-turbo", s"{last_user_message}", 0.85);
+        """
+    )
+
+    formatted_response = response_from_assistant.replace("\\", "\\\\").replace(
+        '"', '\\"'
+    )
+
+    message_record = await database["surrealdb"].query(
+        f"""CREATE ONLY message SET role = 'system', content = s"{formatted_response}";"""
+    )
+
+    sent_record = await database["surrealdb"].query(
+        f"""
+        SELECT 
+            time.written as timestamp
+        FROM ONLY RELATE ONLY {chat_id}->sent->{message_record.get("id")} 
             SET time.written = time::now();
         """
     )
@@ -165,6 +203,7 @@ async def get_response(request: fastapi.Request, chat_id: str):
         {
             "request": request,
             "content": response_from_assistant,
+            "timestamp": sent_record.get("timestamp"),
             "create_title": create_title,
             "chat_id": chat_id,
         },
@@ -177,9 +216,9 @@ async def create_title(chat_id: str):
         f"""
         SELECT
             out.content AS content,
-            time.written AS time_written
+            time.written AS timestamp
         FROM ONLY {chat_id}->sent
-        ORDER BY time_written
+        ORDER BY timestamp 
         LIMIT 1
         FETCH out;
         """

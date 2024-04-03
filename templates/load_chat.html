@@ -1,6 +1,12 @@
 <div class="messages">
     {% for message in messages %}
-    <div class="{{ message.role }} message">{{ message.content | safe }}</div>
+    <div class="{{ message.role }} message">
+        <div class="message-header">
+            <span class="messenger-name">{{ message.role | capitalize }}</span>
+            <span class="message-time">{{ message.timestamp | convert_timestamp_to_date }}</span>
+        </div>
+        <p class="message-content">{{ message.content | safe }}</p>
+    </div>
     {% endfor %}
 </div>
 
