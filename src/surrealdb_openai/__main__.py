@@ -42,7 +42,7 @@ def convert_timestamp_to_date(timestamp: str) -> str:
 templates = templating.Jinja2Templates(directory="templates")
 templates.env.filters["extract_numeric_id"] = extract_numeric_id
 templates.env.filters["convert_timestamp_to_date"] = convert_timestamp_to_date
-database = {}
+life_span = {}
 
 
 @contextlib.asynccontextmanager
@@ -54,10 +54,10 @@ async def lifespan(_: fastapi.FastAPI):
     await connection.use_database("test")
     client = openai.AsyncOpenAI(
     )
-    database["surrealdb"] = connection
-    database["openai"] = client
+    life_span["surrealdb"] = connection
+    life_span["openai"] = client
     yield
-    database.clear()
+    life_span.clear()
 
 
 app = fastapi.FastAPI(lifespan=lifespan)
@@ -72,7 +72,7 @@ async def get_index(request: fastapi.Request):
 @app.post("/new_chat", response_class=responses.HTMLResponse)
 async def new_chat(request: fastapi.Request):
     chat_title = "Untitled chat"
-    chat_record = await database["surrealdb"].query(
+    chat_record = await life_span["surrealdb"].query(
         f"""CREATE ONLY chat SET title = '{chat_title}', time.written = time::now();"""
     )
     return templates.TemplateResponse(
@@ -87,7 +87,7 @@ async def new_chat(request: fastapi.Request):
 
 @app.get("/load_chat/{chat_id}", response_class=responses.HTMLResponse)
 async def load_chat(request: fastapi.Request, chat_id: str):
-    message_records = await database["surrealdb"].query(
+    message_records = await life_span["surrealdb"].query(
         f"""
         SELECT
             out.role AS role,
@@ -110,7 +110,7 @@ async def load_chat(request: fastapi.Request, chat_id: str):
 
 @app.get("/conversations", response_class=responses.HTMLResponse)
 async def conversations(request: fastapi.Request):
-    chat_records = await database["surrealdb"].query(
+    chat_records = await life_span["surrealdb"].query(
         """SELECT id, title, time.written AS timestamp FROM chat ORDER BY timestamp DESC;"""
     )
     return templates.TemplateResponse(
@@ -124,11 +124,11 @@ async def send_message(
     chat_id: str = fastapi.Form(...),
     content: str = fastapi.Form(...),
 ):
-    message_record = await database["surrealdb"].query(
+    message_record = await life_span["surrealdb"].query(
         f"""CREATE ONLY message SET role = 'user', content = '{content}';"""
     )
 
-    sent_record = await database["surrealdb"].query(
+    sent_record = await life_span["surrealdb"].query(
         f"""
         SELECT 
             time.written as timestamp
@@ -150,7 +150,7 @@ async def send_message(
 
 @app.get("/get_response/{chat_id}", response_class=responses.HTMLResponse)
 async def get_response(request: fastapi.Request, chat_id: str):
-    last_user_message_record = await database["surrealdb"].query(
+    last_user_message_record = await life_span["surrealdb"].query(
         f"""
         SELECT
             out.content AS content,
@@ -168,7 +168,7 @@ async def get_response(request: fastapi.Request, chat_id: str):
         .replace('"', '\\"')
     )
 
-    response_from_assistant = await database["surrealdb"].query(
+    response_from_assistant = await life_span["surrealdb"].query(
         f"""
         RETURN fn::surreal_rag("gpt-3.5-turbo", s"{last_user_message}", 0.85);
         """
@@ -178,11 +178,11 @@ async def get_response(request: fastapi.Request, chat_id: str):
         '"', '\\"'
     )
 
-    message_record = await database["surrealdb"].query(
+    message_record = await life_span["surrealdb"].query(
         f"""CREATE ONLY message SET role = 'system', content = s"{formatted_response}";"""
     )
 
-    sent_record = await database["surrealdb"].query(
+    sent_record = await life_span["surrealdb"].query(
         f"""
         SELECT 
             time.written as timestamp
@@ -191,7 +191,7 @@ async def get_response(request: fastapi.Request, chat_id: str):
         """
     )
 
-    chat_record = await database["surrealdb"].query(
+    chat_record = await life_span["surrealdb"].query(
         f"""
         SELECT title FROM ONLY {chat_id};
         """
@@ -212,7 +212,7 @@ async def get_response(request: fastapi.Request, chat_id: str):
 
 @app.get("/create_title/{chat_id}", response_class=responses.PlainTextResponse)
 async def create_title(chat_id: str):
-    first_message_record = await database["surrealdb"].query(
+    first_message_record = await life_span["surrealdb"].query(
         f"""
         SELECT
             out.content AS content,
@@ -224,7 +224,7 @@ async def create_title(chat_id: str):
         """
     )
 
-    completion = await database["openai"].chat.completions.create(
+    completion = await life_span["openai"].chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {
@@ -239,7 +239,7 @@ async def create_title(chat_id: str):
     generated_title = (
         completion.choices[0].message.content.strip().strip('"').strip("'")
     )
-    chat_record = await database["surrealdb"].query(
+    chat_record = await life_span["surrealdb"].query(
         f"""
         UPDATE ONLY {chat_id} SET title = "{generated_title}";
         """
