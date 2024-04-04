@@ -8,12 +8,16 @@ import string
 import zipfile
 
 import fastapi
-import openai
 import pandas as pd
 import surrealdb
 import tqdm
 import wget
 from fastapi import templating, responses, staticfiles
+
+#TODO: 
+# 1. Check templates and adjust CSS
+# 2. Update README.md
+
 
 FORMATTED_RECORD_FOR_INSERT_WIKI_EMBEDDING = string.Template(
     """{url: "$url", title: s"$title", text: s"$text", title_vector: $title_vector, content_vector: $content_vector}"""
@@ -21,7 +25,7 @@ FORMATTED_RECORD_FOR_INSERT_WIKI_EMBEDDING = string.Template(
 
 INSERT_WIKI_EMBEDDING_QUERY = string.Template(
     """
-    INSERT INTO wiki_embeddings [\n $records\n];
+    INSERT INTO wiki_embedding [\n $records\n];
     """
 )
 
@@ -52,10 +56,7 @@ async def lifespan(_: fastapi.FastAPI):
     await connection.signin(data={"username": "root", "password": "root"})
     await connection.use_namespace("test")
     await connection.use_database("test")
-    client = openai.AsyncOpenAI(
-    )
     life_span["surrealdb"] = connection
-    life_span["openai"] = client
     yield
     life_span.clear()
 
@@ -71,16 +72,15 @@ async def get_index(request: fastapi.Request):
 
 @app.post("/new_chat", response_class=responses.HTMLResponse)
 async def new_chat(request: fastapi.Request):
-    chat_title = "Untitled chat"
     chat_record = await life_span["surrealdb"].query(
-        f"""CREATE ONLY chat SET title = '{chat_title}'"""
+        f"""RETURN fn::create_new_chat();"""
     )
     return templates.TemplateResponse(
         "new_chat.html",
         {
             "request": request,
             "chat_id": chat_record.get("id"),
-            "chat_title": chat_title,
+            "chat_title": chat_record.get("title"),
         },
     )
 
@@ -88,15 +88,7 @@ async def new_chat(request: fastapi.Request):
 @app.get("/load_chat/{chat_id}", response_class=responses.HTMLResponse)
 async def load_chat(request: fastapi.Request, chat_id: str):
     message_records = await life_span["surrealdb"].query(
-        f"""
-        SELECT
-            out.role AS role,
-            out.content AS content,
-            timestamp
-        FROM {chat_id}->sent
-        ORDER BY timestamp
-        FETCH out
-        """
+        f"""RETURN fn::load_chat({chat_id})"""
     )
     return templates.TemplateResponse(
         "load_chat.html",
@@ -109,9 +101,10 @@ async def load_chat(request: fastapi.Request, chat_id: str):
 
 
 @app.get("/conversations", response_class=responses.HTMLResponse)
-async def conversations(request: fastapi.Request):
+async def conversations(request: fastapi.Request) -> responses.HTMLResponse:
+    """Load all chats."""
     chat_records = await life_span["surrealdb"].query(
-        """SELECT id, title, created_at FROM chat ORDER BY created_at DESC;"""
+        """RETURN fn::load_all_chats();"""
     )
     return templates.TemplateResponse(
         "conversations.html", {"request": request, "chats": chat_records}
@@ -123,88 +116,39 @@ async def send_message(
     request: fastapi.Request,
     chat_id: str = fastapi.Form(...),
     content: str = fastapi.Form(...),
-):
-    message_record = await life_span["surrealdb"].query(
-        f"""CREATE ONLY message SET role = 'user', content = '{content}';"""
+) -> responses.HTMLResponse:
+    """Send user message."""
+    message = await life_span["surrealdb"].query(
+        f"""RETURN fn::create_user_message({chat_id}, {content});"""
     )
-
-    sent_record = await life_span["surrealdb"].query(
-        f"""
-        SELECT
-            timestamp
-        FROM ONLY RELATE ONLY {chat_id}->sent->{message_record.get("id")} 
-            SET timestamp = time::now();
-        """
-    )
-
     return templates.TemplateResponse(
         "send_message.html",
         {
             "request": request,
             "chat_id": chat_id,
-            "content": message_record.get("content"),
-            "timestamp": sent_record.get("timestamp"),
+            "content": message.get("content"),
+            "timestamp": meesage.get("timestamp"),
         },
     )
 
 
 @app.get("/get_response/{chat_id}", response_class=responses.HTMLResponse)
 async def get_response(request: fastapi.Request, chat_id: str):
-    last_user_message_record = await life_span["surrealdb"].query(
-        f"""
-        SELECT
-            out.content AS content,
-            timestamp AS timestamp 
-        FROM ONLY {chat_id}->sent
-        ORDER BY timestamp DESC
-        LIMIT 1
-        FETCH out;
-        """
+    message = await life_span["surrealdb"].query(
+        f"""RETURN fn::create_system_message({chat_id});"""
     )
 
-    last_user_message = (
-        last_user_message_record.get("content")
-        .replace("\\", "\\\\")
-        .replace('"', '\\"')
+    title = await life_span["surrealdb"].query(
+        f"""RETURN fn::get_chat_title({chat_id});"""
     )
 
-    response_from_assistant = await life_span["surrealdb"].query(
-        f"""
-        RETURN fn::surreal_rag("gpt-3.5-turbo", s"{last_user_message}", 0.85);
-        """
-    )
-
-    formatted_response = response_from_assistant.replace("\\", "\\\\").replace(
-        '"', '\\"'
-    )
-
-    message_record = await life_span["surrealdb"].query(
-        f"""CREATE ONLY message SET role = 'system', content = s"{formatted_response}";"""
-    )
-
-    sent_record = await life_span["surrealdb"].query(
-        f"""
-        SELECT
-            timestamp
-        FROM ONLY RELATE ONLY {chat_id}->sent->{message_record.get("id")} 
-            SET timestamp = time::now();
-        """
-    )
-
-    chat_record = await life_span["surrealdb"].query(
-        f"""
-        SELECT title FROM ONLY {chat_id};
-        """
-    )
-
-    create_title = chat_record["title"] == "Untitled chat"
     return templates.TemplateResponse(
         "system_message.html",
         {
             "request": request,
-            "content": response_from_assistant,
-            "timestamp": sent_record.get("timestamp"),
-            "create_title": create_title,
+            "content": message.get("content"),
+            "timestamp": message.get("timestamp"),
+            "create_title": title == "Untitled chat",
             "chat_id": chat_id,
         },
     )
@@ -212,39 +156,10 @@ async def get_response(request: fastapi.Request, chat_id: str):
 
 @app.get("/create_title/{chat_id}", response_class=responses.PlainTextResponse)
 async def create_title(chat_id: str):
-    first_message_record = await life_span["surrealdb"].query(
-        f"""
-        SELECT
-            out.content AS content,
-            timestamp
-        FROM ONLY {chat_id}->sent
-        ORDER BY timestamp 
-        LIMIT 1
-        FETCH out;
-        """
+    title = await life_span["surrealdb"].query(
+        f"RETURN fn::generate_chat_title({chat_id});"
     )
-
-    completion = await life_span["openai"].chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a conversation title generator for a ChatGPT type app. Respond only with a simple title using the user input.",
-            },
-            {"role": "user", "content": first_message_record.get("content")},
-        ],
-        temperature=0.0,
-    )
-
-    generated_title = (
-        completion.choices[0].message.content.strip().strip('"').strip("'")
-    )
-    chat_record = await life_span["surrealdb"].query(
-        f"""
-        UPDATE ONLY {chat_id} SET title = "{generated_title}";
-        """
-    )
-    return responses.PlainTextResponse(chat_record.get("title"))
+    return responses.PlainTextResponse(title)
 
 
 def setup_logger(name: str) -> logging.Logger:
