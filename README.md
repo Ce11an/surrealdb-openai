@@ -2,6 +2,10 @@
 
 Hey there! You've just stumbled upon a cool little project that's all about mashing up the brilliance of OpenAI with the database wizardry of SurrealDB. Think of this as a sandbox where we're diving deep into the realms of Retrival Augmented Generation (RAG) by mixing up a large dataset of Wikipedia articles with some fancy vector storage and search capabilities.
 
+p
+https://github.com/Ce11an/surrealdb-openai/assets/60790416/a4e6a967-321a-4ca0-8f64-1687512aab38
+
+
 ## So, What's the Big Idea?
 
 We're on a mission to explore the frontiers of what's possible when you pair up SurrealDB with OpenAI. We're talking about importing a whopping 25k Wikipedia articles, complete with their vectors (thanks to OpenAI's smarts), and then whipping up a RAG question-answering system that's as cool as it sounds.
