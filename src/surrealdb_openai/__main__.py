@@ -41,7 +41,7 @@ def extract_id(surrealdb_id: str) -> str:
     CSS classes cannot be named with a `:` so for CSS we extract the ID.
 
     Args:
-        surealdb_id: SurrealDB record ID.
+        surrealdb_id: SurrealDB record ID.
 
     Returns:
         ID.
