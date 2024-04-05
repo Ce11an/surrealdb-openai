@@ -12,7 +12,7 @@ DEFINE FIELD IF NOT EXISTS url ON TABLE wiki_embedding TYPE string
     # Field must be a URL.
     ASSERT string::is::url($value);
 
-DEFINE FIELD title ON TABLE wiki_embedding TYPE string
+DEFINE FIELD IF NOT EXISTS title ON TABLE wiki_embedding TYPE string
     # Field must be non-empty
     ASSERT string::len($value) > 0;
 
@@ -76,7 +76,7 @@ DEFINE FIELD IF NOT EXISTS timestamp ON TABLE sent TYPE datetime
     VALUE time::now();
 
 # A message can only be sent in one chat
-DEFINE INDEX unique_sent_message_in_chat 
+DEFINE INDEX IF NOT EXISTS unique_sent_message_in_chat
     ON TABLE sent
     COLUMNS in, out UNIQUE;
 
@@ -88,7 +88,6 @@ Returns:
     string: Bearer token.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::get_openai_token() {
-    RETURN "Bearer <your-openai-api-key>"
 };
 
 /* OpenAI embeddings complete.
@@ -123,15 +122,16 @@ Returns:
     array<float>: Array of embeddings.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::search_for_documents($input_vector: array<float>, $threshold: float) {
-    LET $context =
-     SELEC
+   LET $context = (
+     SELECT
         url,
         title,
         text
-    FROM ONLY wiki_embedding
+    FROM wiki_embedding
     WHERE
         content_vector <|1|> $input_vector
-            AND vector::similarity::cosine(content_vector, $input_vector) >= $threshold;
+            AND vector::similarity::cosine(content_vector, $input_vector) >= $threshold
+    )[0];
 
     RETURN IF !$context THEN
         ""
@@ -147,7 +147,7 @@ Args:
     context: Context to add to the prompt.
 
 Returns:
-    string: Promt with context.
+    string: Prompt with context.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::get_prompt_with_context($context: string) {
     LET $prompt = "You are an AI assistant answering questions about anything from Simple English Wikipedia the context will provide you with the most relevant data from Simple English Wikipedia including the page title, url, and page content.
@@ -166,8 +166,18 @@ DEFINE FUNCTION IF NOT EXISTS fn::get_prompt_with_context($context: string) {
         $context
     </context>";
     RETURN string::replace($prompt, '$context', $context);
-    
+};
 
+/* OpenAI chat complete.
+
+Args:
+    llm: Large Language Model to use for generation.
+    input: Initial user input.
+    prompt_with_context: Prompt with context for the system.
+
+Returns:
+    string: Response from LLM.
+*/
 DEFINE FUNCTION IF NOT EXISTS fn::chat_complete($llm: string, $input: string, $prompt_with_context: string, $temperature: float) {
     RETURN http::post(
         "https://api.openai.com/v1/chat/completions",
@@ -200,11 +210,11 @@ Args:
 Returns:
     string: Response from LLM.
 */
-DEFINE FUNCTION IF NOT EXISTS fn::surreal_rag($llm: string, $input: string, $threshold: float) {
+DEFINE FUNCTION IF NOT EXISTS fn::surreal_rag($llm: string, $input: string, $threshold: float, $temperature: float) {
     LET $input_vector = fn::embeddings_complete("text-embedding-ada-002", $input);
     LET $context_document = fn::search_for_documents($input_vector, $threshold);
     LET $prompt_with_context = fn::get_prompt_with_context($context_document);
-    RETURN fn::chat_complete($llm, $input, $prompt_with_context);
+    RETURN fn::chat_complete($llm, $input, $prompt_with_context, $temperature);
 };
 
 /* Create a message.
@@ -232,12 +242,12 @@ DEFINE FUNCTION IF NOT EXISTS fn::create_message(
             content = $content;
 
     # Create a relation between the chat record and the message record and get the resulting timestamp.
-    LET $timestamp = 
+    LET $timestamp =
         SELECT VALUE
             timestamp 
         FROM ONLY 
             RELATE ONLY $chat_id->sent->$message_id;
- 
+
     RETURN {
         content: $content,
         timestamp: $timestamp
@@ -266,17 +276,18 @@ Returns:
     object: Content and timestamp.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::create_system_message($chat_id: record<chat>) {
-    LET $last_user_message_record = 
+    LET $last_user_message_content = (
         SELECT
             out.content AS content,
             timestamp AS timestamp 
         FROM ONLY $chat_id->sent
         ORDER BY timestamp DESC
         LIMIT 1
-        FETCH out;
+        FETCH out
+    ).content;
 
-    LET $llm_response = fn::surreal_rag("gpt-3.5-turbo", $last_user_message, 0.85);
-    
+    LET $llm_response = fn::surreal_rag("gpt-3.5-turbo", $last_user_message_content, 0.85, 0.5);
+
     RETURN fn::create_message($chat_id, "system", $llm_response);
 };
 
@@ -308,17 +319,19 @@ DEFINE FUNCTION IF NOT EXISTS fn::generate_chat_title($chat_id: record<chat>) {
 
     # Update the title of the chat and return the title.
     RETURN 
-        UPDATE ONLY $chat_id 
-        SET title = $generated_title
-        RETURN title;
+        SELECT VALUE
+            title
+        FROM ONLY UPDATE ONLY $chat_id
+            SET title = $generated_title
+            RETURN title;
 };
 
 /* Create a new chat.
 
 Returns:
-    dict: Object containing `id` and `title`.
+    object: Object containing `id` and `title`.
 */
-DEFINE FUNCTION IF NOT EXISTS fn::create_new_chat() {
+DEFINE FUNCTION IF NOT EXISTS fn::create_chat() {
     RETURN CREATE ONLY chat 
         RETURN id, title;
 };
@@ -331,7 +344,7 @@ Args:
 Returns:
     array[objects]: Array of messages containing `role` and `content`.
 */
-DEFINE FUNCTION IF NOT EXISTS fn::create_new_chat($chat_id: record<chat>) {
+DEFINE FUNCTION IF NOT EXISTS fn::load_chat($chat_id: record<chat>) {
     RETURN 
         SELECT
             out.role AS role,
@@ -365,3 +378,4 @@ Returns:
 DEFINE FUNCTION IF NOT EXISTS fn::get_chat_title($chat_id: record<chat>) {
     RETURN SELECT VALUE title FROM ONLY $chat_id;
 };
+

@@ -12,11 +12,11 @@
 
 <body>
     <nav>
-        <button hx-post="/new_chat" hx-target="#chats" hx-swap="afterbegin">
+        <button hx-post="/create-chat" hx-target="#chats" hx-swap="afterbegin">
             <img src="{{ url_for('static', path='/surrealdb-icon.svg') }}" alt="SurrealDB Logo" class="surrealdb-logo">
             New Chat
         </button>
-        <div id="chats" hx-get="/conversations" hx-trigger="load"></div>
+        <div id="chats" hx-get="/chats" hx-trigger="load"></div>
     </nav>
     <main>
 

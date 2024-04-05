@@ -25,8 +25,6 @@ surreal-start: ## Start SurrealDB
 .PHONY: surreal-init
 surreal-init: ## Initialise SurrealDB to populate with data
 	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/define_ns_db.surql
-	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/wikipedia_table.surql
-	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/rag_functions.surql
 	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/chats.surql
 
 .PHONY: surreal-remove
