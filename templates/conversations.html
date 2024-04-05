@@ -1,4 +1,0 @@
-{% for chat in chats %}
-<button hx-get="/load_chat/{{ chat.id }}" class="chat-{{ chat.id | extract_numeric_id }}" hx-target="main">{{ chat.title
-    }}</button>
-{% endfor %}

@@ -5,6 +5,7 @@ import contextlib
 import datetime
 import logging
 import string
+from typing import AsyncGenerator
 import zipfile
 
 import fastapi
@@ -14,7 +15,7 @@ import tqdm
 import wget
 from fastapi import templating, responses, staticfiles
 
-#TODO: 
+#TODO:
 # 1. Check templates and adjust CSS
 # 2. Update README.md
 
@@ -33,24 +34,45 @@ TOTAL_ROWS = 25000
 CHUNK_SIZE = 100
 
 
-def extract_numeric_id(surrealdb_id: str) -> str:
+def extract_id(surrealdb_id: str) -> str:
+    """Extract numeric ID from SurrealDB record ID.
+
+    SurrealDB record ID comes in the form of `<table_name>:<unique_id>`.
+    CSS classes cannot be named with a `:` so for CSS we extract the ID.
+
+    Args:
+        surealdb_id: SurrealDB record ID.
+
+    Returns:
+        ID.
+    """
     return surrealdb_id.split(":")[1]
 
 
 def convert_timestamp_to_date(timestamp: str) -> str:
-    """Convert a datetime to a different format."""
+    """Convert a SurrealDB `datetime` to a readable string.
+
+    The result will be of the format: `April 05 2024, 15:30`.
+
+    Args:
+        timestamp: SurrealDB `datetime` value.
+
+    Returns:
+        Date as a string.
+    """
     parsed_timestamp = datetime.datetime.fromisoformat(timestamp.rstrip("Z"))
     return parsed_timestamp.strftime("%B %d %Y, %H:%M")
 
 
 templates = templating.Jinja2Templates(directory="templates")
-templates.env.filters["extract_numeric_id"] = extract_numeric_id
+templates.env.filters["extract_id"] = extract_id
 templates.env.filters["convert_timestamp_to_date"] = convert_timestamp_to_date
 life_span = {}
 
 
 @contextlib.asynccontextmanager
-async def lifespan(_: fastapi.FastAPI):
+async def lifespan(_: fastapi.FastAPI) -> AsyncGenerator:
+    """FastAPI lifespan to create and destroy objects."""
     connection = surrealdb.AsyncSurrealDB(url="ws://localhost:8080/rpc")
     await connection.connect()
     await connection.signin(data={"username": "root", "password": "root"})
@@ -66,17 +88,17 @@ app.mount("/static", staticfiles.StaticFiles(directory="static"), name="static")
 
 
 @app.get("/", response_class=responses.HTMLResponse)
-async def get_index(request: fastapi.Request):
+async def index(request: fastapi.Request) -> responses.HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.post("/new_chat", response_class=responses.HTMLResponse)
-async def new_chat(request: fastapi.Request):
+@app.post("/create-chat", response_class=responses.HTMLResponse)
+async def create_chat(request: fastapi.Request) -> responses.HTMLResponse:
     chat_record = await life_span["surrealdb"].query(
-        f"""RETURN fn::create_new_chat();"""
+        f"""RETURN fn::create_chat();"""
     )
     return templates.TemplateResponse(
-        "new_chat.html",
+        "create_chat.html",
         {
             "request": request,
             "chat_id": chat_record.get("id"),
@@ -85,8 +107,8 @@ async def new_chat(request: fastapi.Request):
     )
 
 
-@app.get("/load_chat/{chat_id}", response_class=responses.HTMLResponse)
-async def load_chat(request: fastapi.Request, chat_id: str):
+@app.get("/load-chat/{chat_id}", response_class=responses.HTMLResponse)
+async def load_chat(request: fastapi.Request, chat_id: str) -> responses.HTMLResponse:
     message_records = await life_span["surrealdb"].query(
         f"""RETURN fn::load_chat({chat_id})"""
     )
@@ -100,40 +122,40 @@ async def load_chat(request: fastapi.Request, chat_id: str):
     )
 
 
-@app.get("/conversations", response_class=responses.HTMLResponse)
-async def conversations(request: fastapi.Request) -> responses.HTMLResponse:
+@app.get("/chats", response_class=responses.HTMLResponse)
+async def chats(request: fastapi.Request) -> responses.HTMLResponse:
     """Load all chats."""
     chat_records = await life_span["surrealdb"].query(
         """RETURN fn::load_all_chats();"""
     )
     return templates.TemplateResponse(
-        "conversations.html", {"request": request, "chats": chat_records}
+        "chats.html", {"request": request, "chats": chat_records}
     )
 
 
-@app.post("/send_message", response_class=responses.HTMLResponse)
-async def send_message(
+@app.post("/send-user-message", response_class=responses.HTMLResponse)
+async def send_user_message(
     request: fastapi.Request,
     chat_id: str = fastapi.Form(...),
     content: str = fastapi.Form(...),
 ) -> responses.HTMLResponse:
     """Send user message."""
     message = await life_span["surrealdb"].query(
-        f"""RETURN fn::create_user_message({chat_id}, {content});"""
+        f"""RETURN fn::create_user_message({chat_id}, s"{content}");"""
     )
     return templates.TemplateResponse(
-        "send_message.html",
+        "send_user_message.html",
         {
             "request": request,
             "chat_id": chat_id,
             "content": message.get("content"),
-            "timestamp": meesage.get("timestamp"),
+            "timestamp": message.get("timestamp"),
         },
     )
 
 
-@app.get("/get_response/{chat_id}", response_class=responses.HTMLResponse)
-async def get_response(request: fastapi.Request, chat_id: str):
+@app.get("/send-system-message/{chat_id}", response_class=responses.HTMLResponse)
+async def send_system_message(request: fastapi.Request, chat_id: str) -> responses.HTMLResponse:
     message = await life_span["surrealdb"].query(
         f"""RETURN fn::create_system_message({chat_id});"""
     )
@@ -143,7 +165,7 @@ async def get_response(request: fastapi.Request, chat_id: str):
     )
 
     return templates.TemplateResponse(
-        "system_message.html",
+        "send_system_message.html",
         {
             "request": request,
             "content": message.get("content"),
@@ -154,12 +176,12 @@ async def get_response(request: fastapi.Request, chat_id: str):
     )
 
 
-@app.get("/create_title/{chat_id}", response_class=responses.PlainTextResponse)
-async def create_title(chat_id: str):
+@app.get("/create-title/{chat_id}", response_class=responses.PlainTextResponse)
+async def create_title(chat_id: str) -> responses.PlainTextResponse:
     title = await life_span["surrealdb"].query(
         f"RETURN fn::generate_chat_title({chat_id});"
     )
-    return responses.PlainTextResponse(title)
+    return responses.PlainTextResponse(title.strip('\"'))
 
 
 def setup_logger(name: str) -> logging.Logger:
@@ -246,3 +268,5 @@ def surreal_insert() -> None:
                 )
             )
             pbar.update(1)
+            break
+
