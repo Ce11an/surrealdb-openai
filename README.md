@@ -105,7 +105,7 @@ make surreal-sql
 And here's a taste of what you can do with a RAG operation:
 
 ```sql
-RETURN fn::surreal_rag("gpt-3.5-turbo", "Who is the greatest basketball player of all time?", 0.85);
+RETURN fn::surreal_rag("gpt-3.5-turbo", "Who is the greatest basketball player of all time?", 0.85, 0.5);
 ```
 
 ### Let's chat?
