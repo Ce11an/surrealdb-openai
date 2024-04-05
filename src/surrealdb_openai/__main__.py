@@ -15,10 +15,6 @@ import tqdm
 import wget
 from fastapi import templating, responses, staticfiles
 
-# TODO:
-# 1. Check templates and adjust CSS
-# 2. Update README.md
-
 
 FORMATTED_RECORD_FOR_INSERT_WIKI_EMBEDDING = string.Template(
     """{url: "$url", title: s"$title", text: s"$text", title_vector: $title_vector, content_vector: $content_vector}"""
@@ -274,4 +270,3 @@ def surreal_insert() -> None:
                 )
             )
             pbar.update(1)
-
