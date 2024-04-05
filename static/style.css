@@ -97,6 +97,12 @@ main form button {
     height: 100%;
 }
 
+a:-webkit-any-link {
+    color: #ff00a0;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
 .messages {
     overflow-y: auto;
     flex: 1;
