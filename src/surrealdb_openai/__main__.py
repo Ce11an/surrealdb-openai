@@ -15,7 +15,7 @@ import tqdm
 import wget
 from fastapi import templating, responses, staticfiles
 
-#TODO:
+# TODO:
 # 1. Check templates and adjust CSS
 # 2. Update README.md
 
@@ -95,7 +95,7 @@ async def index(request: fastapi.Request) -> responses.HTMLResponse:
 @app.post("/create-chat", response_class=responses.HTMLResponse)
 async def create_chat(request: fastapi.Request) -> responses.HTMLResponse:
     chat_record = await life_span["surrealdb"].query(
-        f"""RETURN fn::create_chat();"""
+        """RETURN fn::create_chat();"""
     )
     return templates.TemplateResponse(
         "create_chat.html",
@@ -108,7 +108,9 @@ async def create_chat(request: fastapi.Request) -> responses.HTMLResponse:
 
 
 @app.get("/load-chat/{chat_id}", response_class=responses.HTMLResponse)
-async def load_chat(request: fastapi.Request, chat_id: str) -> responses.HTMLResponse:
+async def load_chat(
+    request: fastapi.Request, chat_id: str
+) -> responses.HTMLResponse:
     message_records = await life_span["surrealdb"].query(
         f"""RETURN fn::load_chat({chat_id})"""
     )
@@ -154,8 +156,12 @@ async def send_user_message(
     )
 
 
-@app.get("/send-system-message/{chat_id}", response_class=responses.HTMLResponse)
-async def send_system_message(request: fastapi.Request, chat_id: str) -> responses.HTMLResponse:
+@app.get(
+    "/send-system-message/{chat_id}", response_class=responses.HTMLResponse
+)
+async def send_system_message(
+    request: fastapi.Request, chat_id: str
+) -> responses.HTMLResponse:
     message = await life_span["surrealdb"].query(
         f"""RETURN fn::create_system_message({chat_id});"""
     )
@@ -181,7 +187,7 @@ async def create_title(chat_id: str) -> responses.PlainTextResponse:
     title = await life_span["surrealdb"].query(
         f"RETURN fn::generate_chat_title({chat_id});"
     )
-    return responses.PlainTextResponse(title.strip('\"'))
+    return responses.PlainTextResponse(title.strip('"'))
 
 
 def setup_logger(name: str) -> logging.Logger:
@@ -269,4 +275,3 @@ def surreal_insert() -> None:
             )
             pbar.update(1)
             break
-
