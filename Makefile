@@ -25,16 +25,19 @@ surreal-start: ## Start SurrealDB
 .PHONY: surreal-init
 surreal-init: ## Initialise SurrealDB to populate with data
 	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/define_ns_db.surql
-	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/wikipedia_table.surql
-	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/rag_functions.surql
+	surreal import --conn http://$(ADDRESS) --user root --pass root --ns test --db test schema/chats.surql
 
 .PHONY: surreal-remove
-surreal-remove: ## Remove the SurealDB database.
+surreal-remove: ## Remove the SurealDB database
 	rm -rf data/srdb.db
 
 .PHONY: surreal-sql
 surreal-sql: ## Surreal SQL
 	surreal sql -e ws://$(ADDRESS) --hide-welcome --pretty --json -u root -p root
+
+.PHONY: server-start
+server-start: ## Start FastAPI server
+	uvicorn src.surrealdb_openai.__main__:app --reload
 
 .PHONY: pycache-remove
 pycache-remove:
@@ -43,7 +46,6 @@ pycache-remove:
 .PHONY: dsstore-remove
 dsstore-remove:
 	find . | grep -E ".DS_Store" | xargs rm -rf
-
 
 .PHONY: ruff-remove
 ruff-remove:
