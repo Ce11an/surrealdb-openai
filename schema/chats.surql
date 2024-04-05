@@ -154,7 +154,9 @@ DEFINE FUNCTION IF NOT EXISTS fn::get_prompt_with_context($context: string) {
 
     If referencing the text/context refer to it as Simple English Wikipedia.
 
-    At the end of the response, add one markdown link using the format: [Title](URL) and replace the title and url with the associated title and url of the more relevant page from the context.
+    Please provide your response in Markdown converted to HTML format. Include appropriate headings and lists where relevant.
+
+    At the end of the response, add link a HTML link and replace the title and url with the associated title and url of the more relevant page from the context.
 
     The maximum number of links you can include is 1, do not provide any other references or annotations.
 
@@ -179,7 +181,7 @@ Returns:
     string: Response from LLM.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::chat_complete($llm: string, $input: string, $prompt_with_context: string, $temperature: float) {
-    RETURN http::post(
+    LET $response = http::post(
         "https://api.openai.com/v1/chat/completions",
         {
             "model": $llm,
@@ -198,6 +200,9 @@ DEFINE FUNCTION IF NOT EXISTS fn::chat_complete($llm: string, $input: string, $p
         "Authorization": fn::get_openai_token()
     }
     )["choices"][0]["message"]["content"];
+
+    # Sometimes there are double quotes
+    RETURN string::replace($response, '"', '');
 };
 
 /* Perfrom RAG using the `text-embedding-ada-002` model for embeddings.
