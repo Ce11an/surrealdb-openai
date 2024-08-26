@@ -8,11 +8,6 @@ ADDRESS := $(HOST):$(PORT)
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: install
-install: ## Install dependencies
-	pip install -e .
-	pip install ruff==0.3.0
-
 .PHONY: fmt
 fmt: ## Format code
 	ruff format .
@@ -37,7 +32,7 @@ surreal-sql: ## Surreal SQL
 
 .PHONY: server-start
 server-start: ## Start FastAPI server
-	uvicorn src.surrealdb_openai.__main__:app --reload
+	uvicorn src.surrealdb_openai.app:app --reload
 
 .PHONY: pycache-remove
 pycache-remove:
