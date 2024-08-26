@@ -88,6 +88,7 @@ Returns:
     string: Bearer token.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::get_openai_token() {
+    RETURN "Bearer " + $openai_token;
 };
 
 /* OpenAI embeddings complete.
@@ -394,4 +395,3 @@ Returns:
 DEFINE FUNCTION IF NOT EXISTS fn::get_chat_title($chat_id: record<chat>) {
     RETURN SELECT VALUE title FROM ONLY $chat_id;
 };
-

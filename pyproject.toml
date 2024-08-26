@@ -16,12 +16,13 @@ dependencies = [
     "pandas",
     "wget",
     "pandas-stubs",
-    "surrealdb-beta @ git+https://github.com/surrealdb/surrealdb.py",
+    "surrealdb==0.3.1",
     "tqdm",
     "fastapi",
     "uvicorn",
     "jinja2",
     "python-multipart",
+    "python-dotenv",
 ]
 
 [project.scripts]
