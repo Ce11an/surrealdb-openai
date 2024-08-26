@@ -18,6 +18,8 @@ The backend is powered by a FastAPI server, with Jinja2 handling template render
 
 2. **Python 3.11**: We use [uv](https://docs.astral.sh/uv/) to manage dependencies.
 
+3. **SurrealDB Python SDK**: The [SurrealDB Python SDK](https://github.com/surrealdb/surrealdb.py/tree/main) is currently in beta. To install the dependency, please ensure you have `rust` installed on your system.
+
 ### Installation
 
 Clone the repository:
