@@ -10,8 +10,7 @@
     {% endfor %}
 </div>
 
-<form id="messageform" hx-post="/send-user-message" hx-target=".messages" hx-swap="beforeend">
-    <input type="hidden" name="chat_id" value="{{ chat_id }}" />
+<form id="messageform" hx-post="/chats/{{ chat_id }}/send-user-message" hx-target=".messages" hx-swap="beforeend">
     <input type="text" name="content" />
     <button>Send</button>
 </form>

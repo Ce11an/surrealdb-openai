@@ -1,4 +1,4 @@
-<div class="system message" {% if create_title %}hx-trigger="load" hx-get="/create-title/{{ chat_id }}"
+<div class="system message" {% if create_title %}hx-trigger="load" hx-post="chats/{{ chat_id }}/title"
     hx-target=".chat-{{ chat_id | extract_id }}" {% endif %}>
     <div class="message-header">
         <span class="messenger-name"> System</span>

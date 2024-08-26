@@ -1,4 +1,4 @@
-<div class="user message" hx-trigger="load" hx-get="/send-system-message/{{ chat_id }}" hx-target=".messages"
+<div class="user message" hx-trigger="load" hx-post="chats/{{ chat_id }}/send-system-message" hx-target=".messages"
     hx-swap="beforeend">
     <div class="message-header">
         <span class="messenger-name"> User</span>
