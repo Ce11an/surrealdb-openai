@@ -11,12 +11,12 @@ authors = [
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.11"
+requires-python = ">=3.11, <3.12"
 dependencies = [
     "pandas",
     "wget",
     "pandas-stubs",
-    "surrealdb==0.3.1",
+    "surrealdb-beta @ git+https://github.com/surrealdb/surrealdb.py",
     "tqdm",
     "fastapi",
     "uvicorn",

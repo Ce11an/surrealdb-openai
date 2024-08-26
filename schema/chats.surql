@@ -88,7 +88,7 @@ Returns:
     string: Bearer token.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::get_openai_token() {
-    RETURN "Bearer " + $openai_token;
+    RETURN "Bearer " + $openai_token
 };
 
 /* OpenAI embeddings complete.
@@ -123,23 +123,21 @@ Returns:
     array<float>: Array of embeddings.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::search_for_documents($input_vector: array<float>, $threshold: float) {
-   LET $results = (
+   LET $context = (
      SELECT
         url,
         title,
         text,
-        vector::similarity::cosine(content_vector, $input_vector) AS similarity
+        vector::similarity::cosine(content_vector, $input_vector) AS similarity_score
     FROM wiki_embedding
     WHERE content_vector <|1|> $input_vector
-    ORDER BY similarity DESC
-    LIMIT 5
-   );
+    )[0];
 
-   RETURN {
-     results: $results,
-     count: array::len($results),
-     threshold: $threshold
-   };
+    RETURN IF $context.similarity_score > $threshold {
+        type::string((SELECT url, title, text FROM $context)[0])
+    } ELSE {
+        ""
+    }
 };
 
 
@@ -219,19 +217,9 @@ Returns:
 */
 DEFINE FUNCTION IF NOT EXISTS fn::surreal_rag($llm: string, $input: string, $threshold: float, $temperature: float) {
     LET $input_vector = fn::embeddings_complete("text-embedding-ada-002", $input);
-    LET $search_results = fn::search_for_documents($input_vector, $threshold);
-    
-    LET $context = array::join($search_results.results[*].text, "\n\n");
-    
-    LET $prompt = "Use the following information to answer the question. If the answer cannot be found in the given information, say 'I don't have enough information to answer that question.'\n\nInformation:\n" + $context + "\n\nQuestion: " + $input + "\n\nAnswer:";
-    
-    LET $answer = fn::chat_complete($llm, $prompt, "", $temperature);
-    
-    RETURN {
-        answer: $answer,
-        search_results: $search_results,
-        input: $input
-    };
+    LET $context_document = fn::search_for_documents($input_vector, $threshold);
+    LET $prompt_with_context = fn::get_prompt_with_context($context_document);
+    RETURN fn::chat_complete($llm, $input, $prompt_with_context, $temperature);
 };
 
 /* Create a message.
@@ -303,9 +291,9 @@ DEFINE FUNCTION IF NOT EXISTS fn::create_system_message($chat_id: record<chat>) 
         FETCH out
     ).content;
 
-    LET $rag_response = fn::surreal_rag("gpt-3.5-turbo", $last_user_message_content, 0.5, 0.5);
-    
-    RETURN fn::create_message($chat_id, "system", $rag_response.answer);
+    LET $llm_response = fn::surreal_rag("gpt-3.5-turbo", $last_user_message_content, 0.80, 0.5);
+
+    RETURN fn::create_message($chat_id, "system", $llm_response);
 };
 
 /* Generate a chat title based on the user's message in a chat.
@@ -395,3 +383,4 @@ Returns:
 DEFINE FUNCTION IF NOT EXISTS fn::get_chat_title($chat_id: record<chat>) {
     RETURN SELECT VALUE title FROM ONLY $chat_id;
 };
+
