@@ -80,20 +80,6 @@ Insert the dataset into SurrealDB:
 surreal-insert
 ```
 
-### Running a RAG Operation
-
-Access the SurrealDB shell using SurrealQL:
-
-```bash
-make surreal-sql
-```
-
-Example of a RAG query:
-
-```sql
-RETURN fn::surreal_rag("gpt-3.5-turbo", "Who is the greatest basketball player of all time?", 0.85, 0.5);
-```
-
 ### Starting the Chat Application
 
 To start the chat server:
