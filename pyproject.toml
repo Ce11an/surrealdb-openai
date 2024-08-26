@@ -22,6 +22,7 @@ dependencies = [
     "uvicorn",
     "jinja2",
     "python-multipart",
+    "python-dotenv",
 ]
 
 [project.scripts]

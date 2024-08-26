@@ -22,25 +22,15 @@ The backend is powered by a FastAPI server, with Jinja2 handling template render
 
 ### Installation
 
-Clone the repository:
+1. Clone the repository.
 
-```bash
-git clone https://github.com/Ce11an/surrealdb-openai.git
-```
-
-You will need an OpenAI API key for this project. If you don't have one, you can obtain it by following the [OpenAI Developer Quickstart](https://platform.openai.com/docs/quickstart). Due to current limitations with SurrealDB and environment variables, please manually insert your OpenAI API key into the `chats.surql` file:
-
-```sql
-DEFINE FUNCTION IF NOT EXISTS fn::get_openai_token() {
-    RETURN "Bearer <your-secret-key-here>";
-};
-```
+2. You will need an OpenAI API token for this project. If you don't have one, you can obtain it by following the [OpenAI Developer Quickstart](https://platform.openai.com/docs/quickstart). Rename the `.env.example` file to `.env` and replace the placeholder with your key.
 
 **Note:** This project is intended for experimental purposes only. Ensure that your OpenAI API key is kept secure.
 
 ### Setting Up SurrealDB
 
-To initialize SurrealDB, use the following `make` commands:
+To initialise SurrealDB, use the following `make` commands:
 
 1. Start SurrealDB with on-disk persistence:
 
@@ -48,7 +38,7 @@ To initialize SurrealDB, use the following `make` commands:
    make surreal-start
    ```
 
-2. Initialize the database with the required tables and functions:
+2. Initialise the database with the required tables and functions:
 
    ```bash
    make surreal-init

@@ -1,12 +1,18 @@
 """Backend for SurrealDB chat interface."""
 
+import os
+
 import contextlib
 import datetime
 from typing import AsyncGenerator
 
 import fastapi
 import surrealdb
+import dotenv
 from fastapi import templating, responses, staticfiles
+
+
+dotenv.load_dotenv()
 
 
 def extract_id(surrealdb_id: str) -> str:
@@ -48,11 +54,14 @@ life_span = {}
 @contextlib.asynccontextmanager
 async def lifespan(_: fastapi.FastAPI) -> AsyncGenerator:
     """FastAPI lifespan to create and destroy objects."""
+    openai_token = os.environ["OPENAI_TOKEN"]
+
     connection = surrealdb.AsyncSurrealDB(url="ws://localhost:8080/rpc")
     await connection.connect()
     await connection.signin(data={"username": "root", "password": "root"})
     await connection.use_namespace("test")
     await connection.use_database("test")
+    await connection.set(key="openai_token", value=openai_token)
     life_span["surrealdb"] = connection
     yield
     life_span.clear()

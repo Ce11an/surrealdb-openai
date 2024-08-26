@@ -88,6 +88,7 @@ Returns:
     string: Bearer token.
 */
 DEFINE FUNCTION IF NOT EXISTS fn::get_openai_token() {
+    RETURN "Bearer " + $openai_token
 };
 
 /* OpenAI embeddings complete.
@@ -126,18 +127,17 @@ DEFINE FUNCTION IF NOT EXISTS fn::search_for_documents($input_vector: array<floa
      SELECT
         url,
         title,
-        text
+        text,
+        vector::similarity::cosine(content_vector, $input_vector) AS similarity_score
     FROM wiki_embedding
-    WHERE
-        content_vector <|1|> $input_vector
-            AND vector::similarity::cosine(content_vector, $input_vector) >= $threshold
+    WHERE content_vector <|1|> $input_vector
     )[0];
 
-    RETURN IF !$context THEN
+    RETURN IF $context.similarity_score > $threshold {
+        type::string((SELECT url, title, text FROM $context)[0])
+    } ELSE {
         ""
-    ELSE
-        type::string($context)
-    END
+    }
 };
 
 
@@ -291,7 +291,7 @@ DEFINE FUNCTION IF NOT EXISTS fn::create_system_message($chat_id: record<chat>) 
         FETCH out
     ).content;
 
-    LET $llm_response = fn::surreal_rag("gpt-3.5-turbo", $last_user_message_content, 0.85, 0.5);
+    LET $llm_response = fn::surreal_rag("gpt-3.5-turbo", $last_user_message_content, 0.80, 0.5);
 
     RETURN fn::create_message($chat_id, "system", $llm_response);
 };
