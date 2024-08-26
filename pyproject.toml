@@ -25,43 +25,28 @@ dependencies = [
 ]
 
 [project.scripts]
-surreal-insert = "surrealdb_openai.__main__:surreal_insert"
-get-data = "surrealdb_openai.__main__:get_data"
+surreal-insert = "surrealdb_openai.insert:surreal_insert"
+download-data = "surrealdb_openai.download:download_data"
 
 [tool.ruff]
 target-version = "py311"
 line-length = 80
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-    ".git",
-    "__pycache__",
-]
+
+[lint]
+select = ["ALL"]
+ignore = ["ISC001", "COM812"]
+
+[lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.format]
-# Like Black, use double quotes for strings.
 quote-style = "double"
-# Like Black, indent with spaces, rather than tabs.
 indent-style = "space"
-# Like Black, respect magic trailing commas.
 skip-magic-trailing-comma = false
-# Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.6.2",
+]
 
