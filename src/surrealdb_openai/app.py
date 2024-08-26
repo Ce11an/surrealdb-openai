@@ -76,8 +76,9 @@ async def index(request: fastapi.Request) -> responses.HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.post("/create-chat", response_class=responses.HTMLResponse)
+@app.post("/chats", response_class=responses.HTMLResponse)
 async def create_chat(request: fastapi.Request) -> responses.HTMLResponse:
+    """Create a chat."""
     chat_record = await life_span["surrealdb"].query(
         """RETURN fn::create_chat();"""
     )
@@ -91,10 +92,11 @@ async def create_chat(request: fastapi.Request) -> responses.HTMLResponse:
     )
 
 
-@app.get("/load-chat/{chat_id}", response_class=responses.HTMLResponse)
+@app.get("/chats/{chat_id}", response_class=responses.HTMLResponse)
 async def load_chat(
     request: fastapi.Request, chat_id: str
 ) -> responses.HTMLResponse:
+    """Load a chat."""
     message_records = await life_span["surrealdb"].query(
         f"""RETURN fn::load_chat({chat_id})"""
     )
@@ -109,7 +111,7 @@ async def load_chat(
 
 
 @app.get("/chats", response_class=responses.HTMLResponse)
-async def chats(request: fastapi.Request) -> responses.HTMLResponse:
+async def load_all_chats(request: fastapi.Request) -> responses.HTMLResponse:
     """Load all chats."""
     chat_records = await life_span["surrealdb"].query(
         """RETURN fn::load_all_chats();"""
@@ -119,10 +121,12 @@ async def chats(request: fastapi.Request) -> responses.HTMLResponse:
     )
 
 
-@app.post("/send-user-message", response_class=responses.HTMLResponse)
+@app.post(
+    "/chats/{chat_id}/send-user-message", response_class=responses.HTMLResponse
+)
 async def send_user_message(
     request: fastapi.Request,
-    chat_id: str = fastapi.Form(...),
+    chat_id: str,
     content: str = fastapi.Form(...),
 ) -> responses.HTMLResponse:
     """Send user message."""
@@ -140,12 +144,14 @@ async def send_user_message(
     )
 
 
-@app.get(
-    "/send-system-message/{chat_id}", response_class=responses.HTMLResponse
+@app.post(
+    "/chats/{chat_id}/send-system-message",
+    response_class=responses.HTMLResponse,
 )
 async def send_system_message(
     request: fastapi.Request, chat_id: str
 ) -> responses.HTMLResponse:
+    """Send system message."""
     message = await life_span["surrealdb"].query(
         f"""RETURN fn::create_system_message({chat_id});"""
     )
@@ -166,8 +172,9 @@ async def send_system_message(
     )
 
 
-@app.get("/create-title/{chat_id}", response_class=responses.PlainTextResponse)
+@app.post("/chats/{chat_id}/title", response_class=responses.PlainTextResponse)
 async def create_title(chat_id: str) -> responses.PlainTextResponse:
+    """Create chat title."""
     title = await life_span["surrealdb"].query(
         f"RETURN fn::generate_chat_title({chat_id});"
     )
