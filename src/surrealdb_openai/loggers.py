@@ -7,9 +7,9 @@ def setup_logger(name: str) -> logging.Logger:
     """Configure and return a logger with the given name.
 
     Args:
-        Name of the logger.
+        name: Name of the logger.
 
-    Return:
+    Returns:
         Configured Python logger.
     """
     logger = logging.getLogger(name)
