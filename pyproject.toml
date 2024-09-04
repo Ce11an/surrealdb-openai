@@ -33,11 +33,11 @@ download-data = "surrealdb_openai.download:download_data"
 target-version = "py311"
 line-length = 80
 
-[lint]
+[tool.ruff.lint]
 select = ["ALL"]
 ignore = ["ISC001", "COM812"]
 
-[lint.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.format]

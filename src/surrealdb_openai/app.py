@@ -1,16 +1,14 @@
 """Backend for SurrealDB chat interface."""
 
-import os
-
 import contextlib
 import datetime
-from typing import AsyncGenerator
+import os
+from collections.abc import AsyncGenerator
 
+import dotenv
 import fastapi
 import surrealdb
-import dotenv
-from fastapi import templating, responses, staticfiles
-
+from fastapi import responses, staticfiles, templating
 
 dotenv.load_dotenv()
 

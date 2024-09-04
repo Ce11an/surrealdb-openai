@@ -3,12 +3,11 @@
 import ast
 import string
 
-import tqdm
 import pandas as pd
 import surrealdb
+import tqdm
 
 from surrealdb_openai import loggers
-
 
 FORMATTED_RECORD_FOR_INSERT_WIKI_EMBEDDING = string.Template(
     """{url: "$url", title: s"$title", text: s"$text", title_vector: $title_vector, content_vector: $content_vector}"""
@@ -64,7 +63,7 @@ def surreal_insert() -> None:
                     title_vector=ast.literal_eval(row["title_vector"]),
                     content_vector=ast.literal_eval(row["content_vector"]),
                 )
-                for _, row in chunk.iterrows()  # type: ignore
+                for _, row in chunk.iterrows()
             ]
             connection.query(
                 query=INSERT_WIKI_EMBEDDING_QUERY.substitute(
